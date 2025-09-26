@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>$Tolkien — Chart</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root{
+      --neon:#7b2be8; --neon-2:#a74be0; --neon-dark:rgba(123,43,232,.18);
+      --card-grad:linear-gradient(180deg,rgba(44,8,66,.96),rgba(8,3,26,.82));
+    }
+    body{background: radial-gradient(ellipse at bottom, rgba(109,27,216,.06), transparent 30%), #000;}
+    .card{background:var(--card-grad); border:2px solid rgba(167,75,224,.22); border-radius:18px; box-shadow:0 18px 60px rgba(123,43,232,.06)}
+  </style>
+</head>
+<body class="text-gray-200">
+  <div class="max-w-6xl mx-auto px-4 py-6 space-y-4">
+    <header class="flex items-center gap-3">
+      <img src="assets/tolkien_pfp.png" class="w-10 h-10 rounded-full ring-2 ring-yellow-400" alt="pfp">
+      <h1 class="text-2xl font-semibold">$Tolkien — <span class="text-purple-300">Chart</span></h1>
+      <a href="./index.html" class="ml-auto text-sm underline opacity-80 hover:opacity-100">← Back to App</a>
+    </header>
+
+    <div class="card p-3">
+      <div class="relative" style="padding-top: 56.25%;">
+        <!-- Dexscreener embed (dark theme, responsive) -->
+        <iframe
+          src="https://dexscreener.com/solana/hv6x26ghknyukscevxreraqu8cljv8nkilbq1uebevzh?embed=1&theme=dark"
+          title="Dexscreener Chart"
+          class="absolute inset-0 w-full h-full rounded-xl"
+          frameborder="0"
+          allowfullscreen>
+        </iframe>
+      </div>
+    </div>
+
+    <p class="text-xs opacity-60">
+      Tip: if the chart doesn’t load on some ad-blockers, allow <code>dexscreener.com</code>.
+    </p>
+  </div>
+</body>
+</html>

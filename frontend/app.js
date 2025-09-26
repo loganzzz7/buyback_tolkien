@@ -1,5 +1,5 @@
 // app.js
-// In dev we auto-use http://127.0.0.1:8000.
+// In dev auto-use http://127.0.0.1:8000.
 // In prod (Vercel), set window.API_BASE = "https://your-backend-domain".
 const isLocal = /^(localhost|127\.)/.test(location.hostname);
 const API_BASE = (window.API_BASE || (isLocal ? 'http://127.0.0.1:8000' : '')).replace(/\/+$/, '');
@@ -22,6 +22,11 @@ function renderDashboard(d){
 
   if ($('burnPctLabel')) $('burnPctLabel').textContent = `${d.supply_burned_pct}%`;
   setWidth($('burnFill'), d.supply_burned_pct);
+
+  // Update contract address
+  if ($('contractAddress') && d.token_mint) {
+    $('contractAddress').textContent = d.token_mint;
+  }
 
   const list = $('txList'); if (!list) return;
   const cards = (d.transactions || []).map(tx => {

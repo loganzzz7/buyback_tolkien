@@ -81,28 +81,43 @@ def push_tx(kind: str, amount_sol: float, desc: str, sig: Optional[str] = None):
     STATE["tx"] = STATE["tx"][:50]
 
 def get_balance_sol(pubkey: str) -> float:
-    payload = {"jsonrpc": "2.0", "id": 1, "method": "getBalance",
-               "params": [pubkey, {"commitment": "confirmed"}]}
-    r = requests.post(SOLANA_RPC_URL, json=payload, timeout=30)
-    r.raise_for_status()
-    lamports = r.json()["result"]["value"]
-    return lamports / LAMPORTS_PER_SOL
+    try:
+        payload = {"jsonrpc": "2.0", "id": 1, "method": "getBalance",
+                   "params": [pubkey, {"commitment": "confirmed"}]}
+        r = requests.post(SOLANA_RPC_URL, json=payload, timeout=30)
+        r.raise_for_status()
+        result = r.json()
+        if "result" not in result or "value" not in result["result"]:
+            raise RuntimeError(f"Invalid RPC response: {result}")
+        lamports = result["result"]["value"]
+        return lamports / LAMPORTS_PER_SOL
+    except Exception as e:
+        print(f"[ERROR] Failed to get SOL balance for {pubkey}: {e}")
+        return 0.0
 
 def _send_portal_tx_and_submit(raw_bytes: bytes) -> str:
     """Sign Pump Portal tx and submit to RPC; return signature."""
-    kp = Keypair.from_base58_string(WALLET_PRIVATE_KEY)
-    portal_tx = VersionedTransaction.from_bytes(raw_bytes)
-    signed = VersionedTransaction(portal_tx.message, [kp])
+    if not WALLET_PRIVATE_KEY:
+        raise RuntimeError("WALLET_PRIVATE_KEY not configured")
+    
+    try:
+        kp = Keypair.from_base58_string(WALLET_PRIVATE_KEY)
+        portal_tx = VersionedTransaction.from_bytes(raw_bytes)
+        signed = VersionedTransaction(portal_tx.message, [kp])
 
-    cfg = RpcSendTransactionConfig(preflight_commitment=CommitmentLevel.Confirmed)
-    req = SendVersionedTransaction(signed, cfg)
-    r = requests.post(SOLANA_RPC_URL, headers={"Content-Type": "application/json"},
-                      data=req.to_json(), timeout=60)
-    r.raise_for_status()
-    result = r.json().get("result")
-    if not result:
-        raise RuntimeError(f"Upstream/Portal error: {r.text}")
-    return result
+        cfg = RpcSendTransactionConfig(preflight_commitment=CommitmentLevel.Confirmed)
+        req = SendVersionedTransaction(signed, cfg)
+        r = requests.post(SOLANA_RPC_URL, headers={"Content-Type": "application/json"},
+                          data=req.to_json(), timeout=60)
+        r.raise_for_status()
+        result = r.json().get("result")
+        if not result:
+            error_info = r.json().get("error", {})
+            raise RuntimeError(f"Transaction failed: {error_info}")
+        return result
+    except Exception as e:
+        print(f"[ERROR] Failed to submit transaction: {e}")
+        raise
 
 def pump_portal_trade_local(data: dict) -> str:
     resp = requests.post("https://pumpportal.fun/api/trade-local", data=data, timeout=60)
@@ -189,11 +204,20 @@ def buy_back_sol(amount_sol: float) -> str:
 def burn_recently_bought(amount_sol: float) -> Optional[str]:
     """
     Burn the tokens we just bought.
-    NOTE: Replace this with your real burn logic when ready.
-    For now, we *record* a burn event (no on-chain signature).
+    Uses the burn_tokens service to actually burn tokens on-chain.
     """
-    # When you wire real burn, return the burn tx signature here.
-    return None
+    try:
+        from services.burn_tokens import burn_tokens
+        from decimal import Decimal
+        
+        # Import the burn function and burn all tokens in the wallet
+        # Since we just bought with amount_sol, we burn everything we have
+        sig = burn_tokens(None, burn_all=True)
+        return sig
+    except Exception as e:
+        print(f"[BURN] Error burning tokens: {e}")
+        # Still return None so the calling code can handle gracefully
+        return None
 
 def process_goal_if_crossed():
     """
@@ -255,6 +279,7 @@ class Dashboard(BaseModel):
     next_goal_progress_pct: float
     supply_burned_pct: float
     transactions: list
+    token_mint: str
 
 # ---------- Endpoints ----------
 @app.get("/dashboard", response_model=Dashboard)
@@ -281,6 +306,7 @@ def get_dashboard():
         "next_goal_progress_pct": round(progress_pct, 2),
         "supply_burned_pct": STATE["supply_burned_pct"],
         "transactions": STATE["tx"],
+        "token_mint": TOKEN_MINT,
     }
 
 @app.post("/simulate/bump-mc")

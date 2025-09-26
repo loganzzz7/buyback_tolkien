@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>$Tolkien — Documentation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root{
+      --neon:#7b2be8; --neon-2:#a74be0; --neon-dark:rgba(123,43,232,.18);
+      --panel:rgba(22,7,28,.64);
+      --card-grad:linear-gradient(180deg,rgba(44,8,66,.96),rgba(8,3,26,.82));
+    }
+    body{background: radial-gradient(ellipse at bottom, rgba(109,27,216,.06), transparent 30%), #000;}
+    .card{background:var(--card-grad); border:2px solid rgba(167,75,224,.22); border-radius:18px; box-shadow:0 18px 60px rgba(123,43,232,.06)}
+    .neon{color:var(--neon)}
+    code, pre{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;}
+    pre{background:#0b0412; border:1px solid rgba(255,255,255,.06); border-radius:12px; padding:14px; overflow:auto}
+    a{color:#e9d5ff; text-decoration:underline}
+  </style>
+</head>
+<body class="text-gray-200">
+  <div class="max-w-4xl mx-auto px-4 py-8 space-y-8">
+    <header class="flex items-center gap-4">
+      <img src="assets/tolkien_pfp.png" alt="pfp" class="w-12 h-12 rounded-full ring-2 ring-yellow-400">
+      <div>
+        <h1 class="text-3xl font-semibold">$Tolkien — <span class="neon">Documentation</span></h1>
+        <p class="text-sm opacity-75">Architecture, API, deployment, and operations.</p>
+      </div>
+      <div class="ml-auto">
+        <a href="./index.html" class="text-sm underline opacity-80 hover:opacity-100">← Back to App</a>
+      </div>
+    </header>
+
+    <section class="card p-6 space-y-4">
+      <h2 class="text-xl font-semibold">Overview</h2>
+      <p>
+        The dashboard shows live stats and recent on-chain actions. The backend monitors market cap and, on every
+        <strong>+$100k increment</strong>, executes:
+        <strong>Collect creator rewards → Buy back 25% of claimed SOL → (Burn step next)</strong>.
+      </p>
+      <ul class="list-disc pl-5 space-y-1">
+        <li><strong>Frontend</strong>: Static (Vercel), polls <code>/dashboard</code> every 5s.</li>
+        <li><strong>Backend</strong>: FastAPI (Render), signs Pump Portal transactions and submits via your RPC.</li>
+      </ul>
+    </section>
+
+    <section class="card p-6 space-y-4">
+      <h2 class="text-xl font-semibold">Environment</h2>
+      <pre><code>WALLET_ADDRESS=YourPublicKeyBase58
+WALLET_PRIVATE_KEY=YourPrivateKeyBase58   # keep secret (backend env only)
+SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+HELIUS_API_KEY=YourHeliusKey
+TOKEN_MINT=MintAddressOfYourToken
+PRIORITY_FEE=0.000001
+FRONTEND_ORIGIN=https://YOUR-VERCEL-APP.vercel.app
+</code></pre>
+      <p class="text-sm opacity-80">
+        <strong>Note:</strong> Do not expose <code>WALLET_PRIVATE_KEY</code> in the frontend. Backend only.
+      </p>
+    </section>
+
+    <section class="card p-6 space-y-4">
+      <h2 class="text-xl font-semibold">API Reference</h2>
+
+      <h3 class="font-medium">GET /health</h3>
+      <pre><code>{"ok": true}</code></pre>
+
+      <h3 class="font-medium">GET /dashboard</h3>
+      <p>Returns current metrics + recent transactions (for the horizontal cards).</p>
+      <pre><code>{
+  "price_usd": 34234.23,
+  "volume_change_pct": 6212.5,
+  "buybacks_usd": 10500.0,
+  "burned_usd": 9500.0,
+  "market_cap_usd": 325000.0,
+  "next_goal_usd": 1000000.0,
+  "next_goal_progress_pct": 32.5,
+  "supply_burned_pct": 9.1,
+  "transactions": [
+    {
+      "signature": "BUYBACK_....",
+      "kind": "buyback",  // claim | buyback | burn
+      "amount_sol": 1.234,
+      "status": "confirmed",
+      "timestamp": "2025-09-25T18:00:00Z",
+      "description": "Executed buy-back of 1.234 SOL"
+    }
+  ]
+}</code></pre>
+
+      <h3 class="font-medium">POST /actions/claim-and-buyback</h3>
+      <p>Manual trigger (useful for testing). Automatically used by the 100k workflow.</p>
+
+      <h3 class="font-medium">POST /simulate/bump-mc</h3>
+      <p>Dev-only helper to force MC thresholds while testing.</p>
+      <pre><code>curl -X POST http://127.0.0.1:8000/simulate/bump-mc \
+  -H "Content-Type: application/json" \
+  -d '{"delta_usd":110000}'</code></pre>
+    </section>
+
+    <section class="card p-6 space-y-4">
+      <h2 class="text-xl font-semibold">Workflow</h2>
+      <ol class="list-decimal pl-5 space-y-2">
+        <li>Backend polls Helius to compute Market Cap for <code>TOKEN_MINT</code>.</li>
+        <li>If MC crosses a new +$100k bucket → trigger:
+          <ul class="list-disc pl-5 mt-2 space-y-1">
+            <li><strong>Claim</strong> creator rewards.</li>
+            <li><strong>Buy back</strong> with <strong>25%</strong> of the claimed SOL.</li>
+            <li><strong>Burn</strong> (next step in your pipeline) — dashboard already supports showing these txs.</li>
+          </ul>
+        </li>
+        <li>Each on-chain action is appended to <code>transactions</code> with a signature for Solscan.</li>
+        <li>Frontend updates stat pills, progress bars, and the transaction cards automatically.</li>
+      </ol>
+    </section>
+
+    <section class="card p-6 space-y-4">
+      <h2 class="text-xl font-semibold">Frontend Integration</h2>
+      <p>Set the backend URL in the page footer:</p>
+      <pre><code>&lt;script&gt;
+  window.API_BASE = 'https://your-backend.onrender.com';
+&lt;/script&gt;
+&lt;script src="/app.js"&gt;&lt;/script&gt;</code></pre>
+      <p>UI wiring:</p>
+      <ul class="list-disc pl-5 space-y-1">
+        <li><code>#statPrice</code>, <code>#statVolume</code>, <code>#statBuybacks</code>, <code>#statBurned</code> ← stat pills</li>
+        <li><code>#goalFill</code> (width %) &amp; <code>#goalLabel</code> ← “Next goal” progress</li>
+        <li><code>#burnFill</code> (width %) &amp; <code>#burnPctLabel</code> ← “Supply burned”</li>
+        <li><code>#txList</code> ← cards rendered with icons + Solscan links</li>
+      </ul>
+    </section>
+
+    <section class="card p-6 space-y-4">
+      <h2 class="text-xl font-semibold">Deployment</h2>
+      <ul class="list-disc pl-5 space-y-1">
+        <li>Frontend: Vercel (static). No build needed.</li>
+        <li>Backend: Render (FastAPI). Start: <code>uvicorn main:app --host 0.0.0.0 --port $PORT</code></li>
+        <li>Set <code>FRONTEND_ORIGIN</code> in backend env to your Vercel URL for CORS.</li>
+      </ul>
+    </section>
+
+    <section class="card p-6 space-y-4">
+      <h2 class="text-xl font-semibold">Operations & Troubleshooting</h2>
+      <ul class="list-disc pl-5 space-y-1">
+        <li>If transactions fail with <code>Upstream/Portal error</code>, verify env vars (wallet, mint, RPC, Helius key) and backend logs.</li>
+        <li>Solana RPC hiccups: increase request timeouts slightly.</li>
+        <li>Make sure wallet has enough SOL for fees and buybacks.</li>
+      </ul>
+    </section>
+
+    <footer class="text-center opacity-60 text-sm pt-4">
+      © Tolkien 2025
+    </footer>
+  </div>
+</body>
+</html>
